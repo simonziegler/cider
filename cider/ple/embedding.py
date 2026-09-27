@@ -17,6 +17,7 @@ The values are bit-identical: the same stored bytes go through the same
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import mlx.core as mx
@@ -24,6 +25,9 @@ import mlx.nn as nn
 
 from .layout import read_ple_layout, shard_sizes
 from .store import PLEStore
+
+
+SCHEDULES = ("lazy", "sync", "eager")
 
 
 class CiderPLEEmbedding(nn.Module):
@@ -38,6 +42,7 @@ class CiderPLEEmbedding(nn.Module):
         backend: str | None = None,
         threads: int | None = None,
         parallel_min_rows: int | None = None,
+        schedule: str | None = None,
     ):
         super().__init__()
         self.shard_sizes = shard_sizes(num_embeddings, num_shards)
@@ -54,6 +59,12 @@ class CiderPLEEmbedding(nn.Module):
         self._bits = layout.bits
         self._group_size = layout.group_size
         self._store = PLEStore(layout, backend=backend, threads=threads, parallel_min_rows=parallel_min_rows)
+        # lazy: the gather is a graph node; nothing waits for the host.
+        # sync: evaluate the ids first (as oMLX does), then gather lazily.
+        # eager: evaluate the ids and the gathered rows before returning.
+        self.schedule = schedule or os.environ.get("CIDER_PLE_SCHEDULE", "lazy")
+        if self.schedule not in SCHEDULES:
+            raise ValueError(f"schedule must be one of {SCHEDULES}, got {self.schedule!r}")
 
     @property
     def store(self) -> PLEStore:
@@ -61,7 +72,11 @@ class CiderPLEEmbedding(nn.Module):
 
     def __call__(self, indices: mx.array) -> mx.array:
         shape = indices.shape
+        if self.schedule != "lazy":
+            mx.eval(indices)
         codes, scales, biases = self._store.gather(indices)
+        if self.schedule == "eager":
+            mx.eval(codes, scales, biases)
         values = mx.dequantize(
             codes,
             scales,

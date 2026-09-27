@@ -17,6 +17,7 @@ Safety, in the style of oMLX's own patches (``m5_gather_qmm.py``):
 * Canary: the first lookup of every table is also run through oMLX's class
   and compared exactly. On any difference that table falls back to oMLX's
   class for the rest of its life, and the reason is logged.
+  ``OMLX_CIDER_PLE_CANARY=0`` skips it.
 
 In a private oMLX fork this module is what ``omlx/patches/cider_qwen4_ple.py``
 imports; see the README section "N-gram (PLE) offload".
@@ -99,8 +100,13 @@ class CanaryPLEEmbedding(CiderPLEEmbedding):
         super().close()
 
 
-def apply_cider_qwen4_ple_patch(language=None, *, canary: bool = True) -> bool:
-    """Swap oMLX's SSD-backed PLE table for cider's. Idempotent. True if active."""
+def apply_cider_qwen4_ple_patch(language=None, *, canary: bool | None = None) -> bool:
+    """Swap oMLX's SSD-backed PLE table for cider's. Idempotent. True if active.
+
+    ``canary`` defaults to on; ``OMLX_CIDER_PLE_CANARY=0`` turns it off.
+    """
+    if canary is None:
+        canary = os.environ.get("OMLX_CIDER_PLE_CANARY", "1").strip().lower() not in ("0", "false", "no", "off")
     if os.environ.get("OMLX_CIDER_PLE", "1").strip().lower() in ("0", "false", "no", "off"):
         logger.info("cider PLE patch disabled by OMLX_CIDER_PLE")
         return False
