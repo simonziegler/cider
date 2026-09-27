@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=68", "wheel", "nanobind>=2.12", "mlx>=0.31", "cmake"]
+# nanobind must match the version mlx was built with (mlx 0.32.x: 2.13.0).
+# A newer nanobind (3.x, ABI v22) builds cleanly and then rejects every
+# mx.array argument at call time.
+requires = ["setuptools>=68", "wheel", "nanobind==2.13.0", "mlx>=0.31", "cmake"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +11,7 @@ version = "0.8.0"
 description = "INT8 TensorOps quantized matmul + optimized SDPA for Apple M5+ (W8A8, W4A8)"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 authors = [
     {name = "Wang Shuo"},
 ]

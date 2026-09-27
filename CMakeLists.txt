@@ -9,21 +9,31 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_SHARED_LIBS "Build extensions as a shared library" ON)
 
 # ── Python + nanobind + MLX ──────────────────────────────────────
+# 3.11 is the interpreter oMLX bundles. nanobind applies STABLE_ABI on 3.12+
+# only and ignores it below, so one CMakeLists serves both.
 find_package(
-  Python 3.12
+  Python 3.11
   COMPONENTS Interpreter Development.Module
   REQUIRED)
 
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE nanobind_ROOT)
+# nanobind_ROOT and MLX_ROOT may be passed in (-D...) to build against another
+# interpreter's mlx, e.g. oMLX's bundle, whose Python has no nanobind or
+# headers. The nanobind version must match the one mlx was built with (its ABI
+# tag), or every op fails with "incompatible function arguments".
+if(NOT nanobind_ROOT)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    OUTPUT_VARIABLE nanobind_ROOT)
+endif()
 find_package(nanobind CONFIG REQUIRED)
 
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" -m mlx --cmake-dir
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE MLX_ROOT)
+if(NOT MLX_ROOT)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m mlx --cmake-dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    OUTPUT_VARIABLE MLX_ROOT)
+endif()
 find_package(MLX CONFIG REQUIRED)
 
 # ── Shared library: all primitives ───────────────────────────────
